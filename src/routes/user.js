@@ -4,6 +4,12 @@ const User = require('../models/User');
 const { basicAuth } = require('../middleware/auth');
 const { validateUserCreate, validateUserUpdate } = require('../utils/validation');
 
+// Helper function to validate UUID format
+function isValidUUID(uuid) {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
 // POST /v1/user - Create a new user
 router.post('/v1/user', async (req, res) => {
   try {
@@ -31,7 +37,6 @@ router.post('/v1/user', async (req, res) => {
 
     // Return 201 with user data (password excluded by toJSON method)
     return res.status(201).json(user);
-
   } catch (error) {
     console.error('Error creating user:', error);
     
@@ -49,14 +54,24 @@ router.get('/v1/user/:userId', basicAuth, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Check if authenticated user is requesting their own info
+    // 1. Validate UUID format
+    if (!isValidUUID(userId)) {
+      return res.status(400).end();
+    }
+
+    // 2. Check if user exists
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).end();
+    }
+
+    // 3. Check authorization - user can only access their own info
     if (req.user.id !== userId) {
       return res.status(403).end();
     }
 
-    // User is already loaded in basicAuth middleware
+    // Return user data
     return res.status(200).json(req.user);
-
   } catch (error) {
     console.error('Error getting user:', error);
     return res.status(400).end();
@@ -68,29 +83,43 @@ router.put('/v1/user/:userId', basicAuth, async (req, res) => {
   try {
     const { userId } = req.params;
 
-    // Check if authenticated user is updating their own info
+    // 1. Validate UUID format
+    if (!isValidUUID(userId)) {
+      return res.status(400).end();
+    }
+
+    // 2. Check if user exists
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).end();
+    }
+
+    // 3. Check authorization - user can only update their own info
     if (req.user.id !== userId) {
       return res.status(403).end();
     }
 
-    // Validate update data
+    // 4. Validate update data
     const validationErrors = validateUserUpdate(req.body);
     if (validationErrors.length > 0) {
       return res.status(400).json({ errors: validationErrors });
     }
 
-    // Update allowed fields only
+    // 5. For PUT, all required fields must be present
     const { first_name, last_name, password } = req.body;
-    
-    if (first_name !== undefined) req.user.first_name = first_name;
-    if (last_name !== undefined) req.user.last_name = last_name;
-    if (password !== undefined) req.user.password = password; // Will be hashed by setter
+    if (!first_name || !last_name || !password) {
+      return res.status(400).end();
+    }
+
+    // Update fields
+    req.user.first_name = first_name;
+    req.user.last_name = last_name;
+    req.user.password = password; // Will be hashed by setter
 
     await req.user.save();
 
     // Return 204 No Content
     return res.status(204).end();
-
   } catch (error) {
     console.error('Error updating user:', error);
     return res.status(400).end();
