@@ -105,6 +105,14 @@ router.patch('/v1/product/:productId', basicAuth, async (req, res) => {
       return res.status(400).json({ errors: validationErrors });
     }
 
+    // ADD THIS: Ensure at least one field is provided
+    const allowedFields = ['name', 'description', 'sku', 'manufacturer', 'quantity'];
+    const hasValidField = allowedFields.some(field => req.body.hasOwnProperty(field));
+    
+    if (!hasValidField) {
+      return res.status(400).end();
+    }
+
     const { name, description, sku, manufacturer, quantity } = req.body;
     
     if (name !== undefined) product.name = name;
