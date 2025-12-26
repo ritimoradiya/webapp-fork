@@ -17,6 +17,7 @@ variable "source_ami" {
   default = "ami-0e2c8caa4b6378d8c"
 }
 
+
 variable "ssh_username" {
   type    = string
   default = "ubuntu"
@@ -44,7 +45,7 @@ source "amazon-ebs" "webapp" {
   instance_type   = var.instance_type
   source_ami      = var.source_ami
   ssh_username    = var.ssh_username
-  
+
   ami_users = var.demo_account_id != "" ? [var.demo_account_id] : []
 
   launch_block_device_mappings {
